@@ -10771,6 +10771,9 @@ function abrirHuecoModal(cod, hora, reemplazarId){
       const tarifaObj=s._tarifa||getTarifaSvc(s);
       const tarifaTxt=tarifaObj&&tarifaObj.tarifa!=null?'S/.'+tarifaObj.tarifa:'—';
       const zonaTxt=tarifaObj&&tarifaObj.zona?tarifaObj.zona:'—';
+      // Número de vuelo: busca en s.vuelo, paradas, o muestra TIERRA
+      const vueloTxt=s.vuelo||(s.paradas&&s.paradas.find(p=>p.vuelo)?.vuelo)||'TIERRA';
+      const vueloColor=vueloTxt==='TIERRA'?'#6b7280':'#0369a1';
       // Distancia vacía desde el punto donde el conductor queda libre (prevSvc,
       // o su domicilio si es el primer servicio del día) hasta el punto de
       // recojo de este candidato — para decidir entre opciones con datos reales,
@@ -10788,6 +10791,7 @@ function abrirHuecoModal(cod, hora, reemplazarId){
         <span style="background:${col};color:#fff;border-radius:4px;padding:1px 5px;font-size:9px;font-weight:800;text-align:center">${tipo}</span>
         <span style="font-size:11px;font-weight:700">${hm(s.sm)}</span>
         <span style="font-size:10px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${distritoTxt}</span>
+        <span style="font-size:9px;color:${vueloColor};font-weight:700;white-space:nowrap">${vueloTxt}</span>
         <span style="font-size:9px;color:#7c3aed;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${zonaTxt}">${zonaTxt}</span>
         <span style="font-size:9px;color:#475569;font-weight:600;white-space:nowrap">${unidadTxt}</span>
         <span style="font-size:9px;color:#0369a1;font-weight:700;white-space:nowrap">${kmTxt}</span>
@@ -10797,7 +10801,7 @@ function abrirHuecoModal(cod, hora, reemplazarId){
     }).join('');
   }
   document.getElementById('hm-head').innerHTML=candidatos.length
-    ?'<span></span><span>Hora</span><span>Distrito</span><span>Zona</span><span>Unidad</span><span>Km</span><span>Tarifa</span><span></span>'
+    ?'<span></span><span>Hora</span><span>Distrito</span><span>Vuelo</span><span>Zona</span><span>Unidad</span><span>Km</span><span>Tarifa</span><span></span>'
     :'';
   listEl.innerHTML=listHtml;
   document.getElementById('hueco-modal').classList.add('show');
