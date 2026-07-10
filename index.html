@@ -14041,7 +14041,18 @@ async function fetchEtaPunta(la1,lo1,la2,lo2){
     const AK=window._overrideTTKey||TOMTOM_API_KEY||'';
     if(!AK||_ttDisabled)return null;
     const url=`https://api.tomtom.com/routing/1/calculateRoute/${la1},${lo1}:${la2},${lo2}/json?key=${AK}&traffic=true&travelMode=car`;
-    const r=await fetch(url);if(!r.ok)return null;
+    const r=await fetch(url);
+    if(r.status===403||r.status===429){
+      // Cuota de API agotada — frenar TODO el resto del prefetch en vez de
+      // seguir intentando (y fallando) par por par en silencio. Esto es lo
+      // que antes causaba que solo los primeros pares (los de la mañana,
+      // por el orden cronológico de 'libres') quedaran en caché y el resto
+      // del día (tarde/noche) cayera siempre a Haversine sin explicación.
+      _ttDisabled=true;
+      if(typeof log==='function')log(`⚠ TomTom: cuota de API agotada (${r.status}) — resto del día usará Haversine`,'w');
+      return null;
+    }
+    if(!r.ok)return null;
     const d=await r.json();
     const sec=d.routes?.[0]?.summary?.travelTimeInSeconds;
     if(sec==null)return null;
@@ -14107,15 +14118,24 @@ async function _prefetchAllPeakETAs(libres, ctx){
   log(`🗺 [${ctx}] Cargando ${pending.length} ETAs TomTom con tráfico real...`);
 
   // 4. Fetch en lotes de 8 (límite conexiones browser) con progress
-  const BATCH=8; let done=0;
+  const BATCH=8; let done=0; const _cacheAntes=Object.keys(window._etaCache).length;
   for(let i=0;i<pending.length;i+=BATCH){
+    if(_ttDisabled){
+      log(`⏹ Prefetch detenido: cuota de TomTom agotada. Pendientes sin cachear: ${pending.length-done}`,'w');
+      break;
+    }
     const batch=pending.slice(i,i+BATCH);
     await Promise.allSettled(batch.map(([a,b,c,d])=>fetchEtaPunta(a,b,c,d)));
     done+=batch.length;
     const pct=Math.round(done/pending.length*100);
     log(`🗺 ETAs: ${pct}% (${done}/${pending.length}) — caché: ${Object.keys(window._etaCache).length} pares`);
   }
-  log(`✅ ETAs listos: ${Object.keys(window._etaCache).length} pares en caché`,'ok');
+  const _nuevos=Object.keys(window._etaCache).length-_cacheAntes;
+  if(_ttDisabled&&_nuevos<pending.length){
+    log(`✅ ETAs parciales: ${_nuevos} nuevos (${Object.keys(window._etaCache).length} en total) — el resto de esta corrida usará Haversine por cuota agotada`,'w');
+  } else {
+    log(`✅ ETAs listos: ${Object.keys(window._etaCache).length} pares en caché`,'ok');
+  }
 }
 
 // Botón 🗺 por fila en modal: llama TomTom para ese candidato específico
